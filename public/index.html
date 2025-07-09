@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoTracker - Robô de Busca</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 2rem; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #1a73e8; }
+        form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-weight: 600; margin-bottom: 0.5rem; }
+        input, select { padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        button { grid-column: 1 / -1; padding: 1rem; background-color: #1a73e8; color: white; border: none; border-radius: 4px; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #1558b0; }
+        button:disabled { background-color: #999; cursor: not-allowed; }
+        #results { margin-top: 2rem; }
+        .vehicle { border: 1px solid #eee; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; background: #fafafa; }
+        .vehicle h3 { margin: 0 0 0.5rem 0; }
+        .vehicle a { color: #1a73e8; text-decoration: none; font-weight: 600; }
+        #status { margin-top: 1rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AutoTracker - Robô de Busca Real</h1>
+        <p>Preencha os campos abaixo e clique em "Buscar Veículos" para ativar o robô de scraping.</p>
+        <form id="searchForm">
+            <div class="form-group">
+                <label for="marca">Marca</label>
+                <input type="text" id="marca" value="Honda" required>
+            </div>
+            <div class="form-group">
+                <label for="modelo">Modelo</label>
+                <input type="text" id="modelo" value="Civic" required>
+            </div>
+            <div class="form-group">
+                <label for="valor_maximo">Valor Máximo</label>
+                <input type="number" id="valor_maximo" value="80000">
+            </div>
+            <div class="form-group">
+                <label for="ano_min">Ano Mínimo</label>
+                <input type="number" id="ano_min" value="2018">
+            </div>
+            <div class="form-group">
+                <label for="ano_max">Ano Máximo</label>
+                <input type="number" id="ano_max" value="2020">
+            </div>
+             <div class="form-group">
+                <label for="km_maxima">KM Máxima</label>
+                <input type="number" id="km_maxima" value="60000">
+            </div>
+            <button type="submit" id="submitButton">Buscar Veículos</button>
+        </form>
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('searchForm');
+        const submitButton = document.getElementById('submitButton');
+        const statusDiv = document.getElementById('status');
+        const resultsDiv = document.getElementById('results');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            submitButton.disabled = true;
+            submitButton.innerText = 'Buscando...';
+            statusDiv.innerText = '🤖 Robô ativado. Aguarde, isso pode levar até 1 minuto...';
+            resultsDiv.innerHTML = '';
+
+            const searchConfig = {
+                marca: document.getElementById('marca').value,
+                modelo: document.getElementById('modelo').value,
+                valor_maximo: parseInt(document.getElementById('valor_maximo').value),
+                ano_min: parseInt(document.getElementById('ano_min').value),
+                ano_max: parseInt(document.getElementById('ano_max').value),
+                km_maxima: parseInt(document.getElementById('km_maxima').value),
+            };
+
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ searchConfig })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.details || 'Erro na busca.');
+                }
+
+                const data = await response.json();
+                
+                statusDiv.innerText = `✅ ${data.message}`;
+                
+                if (data.vehicles && data.vehicles.length > 0) {
+                    data.vehicles.forEach(v => {
+                        const vehicleDiv = document.createElement('div');
+                        vehicleDiv.className = 'vehicle';
+                        vehicleDiv.innerHTML = `
+                            <h3><a href__="${v.link_anuncio}" target="_blank">${v.titulo_anuncio}</a></h3>
+                            <p><strong>Preço:</strong> R$ ${v.valor_anunciado ? v.valor_anunciado.toLocaleString('pt-BR') : 'N/A'}</p>
+                            <p><strong>Ano:</strong> ${v.ano || 'N/A'} | <strong>KM:</strong> ${v.quilometragem ? v.quilometragem.toLocaleString('pt-BR') : 'N/A'}</p>
+                            <p><strong>Local:</strong> ${v.localidade || 'N/A'} | <strong>Origem:</strong> ${v.site_origem}</p>
+                        `;
+                        resultsDiv.appendChild(vehicleDiv);
+                    });
+                } else {
+                    resultsDiv.innerHTML = '<p>Nenhum veículo encontrado com esses critérios.</p>';
+                }
+
+            } catch (error) {
+                statusDiv.innerText = `❌ Erro: ${error.message}`;
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerText = 'Buscar Veículos';
+            }
+        });
+    </script>
+</body>
+</html>
